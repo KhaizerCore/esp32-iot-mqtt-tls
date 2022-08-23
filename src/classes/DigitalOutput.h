@@ -7,6 +7,7 @@ class DigitalOutput : Port {       // The class
     public:             // Access specifier
         int tipo;    
         bool nivelLogico;
+        bool state;
 
     DigitalOutput();
     DigitalOutput(int, int, int, bool);
@@ -14,7 +15,8 @@ class DigitalOutput : Port {       // The class
     public: 
         void begin();
         void turnOn();
-        void turnOff();        
+        void turnOff();    
+        void toggle();    
 };
 
 #endif

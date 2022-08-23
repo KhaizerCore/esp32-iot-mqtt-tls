@@ -14,8 +14,8 @@ using namespace std;
 #define LED_BUILTIN 2
 
 
-DigitalOutput builtInLED(LED_BUILTIN, 1, 10, true);
-
+DigitalOutput builtInLED(LED_BUILTIN, 1, 0, true);
+DigitalOutput whiteLED(5, 1, 0, true);
 
 // // cert hivemq
 // const char* ca_cert = \ 
@@ -128,9 +128,11 @@ const char jsonBoardData[] PROGMEM = R"=====(
 }
 )=====";
 
-//WiFiClient espClient;
-WiFiClientSecure net;
+WiFiClient net;
+//WiFiClientSecure net;
 PubSubClient client(net);
+
+bool ledState = false;
 
 time_t now;
 unsigned long lastMillis = 0;
@@ -149,6 +151,8 @@ int random_number(int min, int max) //range : [min, max]
 void messageReceived(String &topic, String &payload) {
   Serial.println("incoming: " + topic + " - " + payload);
 
+
+
   // Note: Do not use the client in the callback to publish, subscribe or
   // unsubscribe as it may cause deadlocks when other things arrive while
   // sending and receiving acknowledgments. Instead, change a global variable,
@@ -163,6 +167,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
     Serial.print((char)payload[i]);
   }
   Serial.println();
+
+  builtInLED.toggle();
 }
 
 void reconnect(){
@@ -170,9 +176,9 @@ void reconnect(){
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
     // Create a random client ID
-    String clientId = "ESP32Client";
-    String username = "sigiotsystem";
-    String password = "sigiotsystem";
+    String clientId = "ESP32Client-gustavaolegutao";
+    String username = "emqx";//"sigiotsystem";
+    String password = "public";//"sigiotsystem";
 
     Serial.print("Time:");
     Serial.print(ctime(&now));
@@ -193,8 +199,60 @@ void reconnect(){
   }
 }
 
+void mqttSendMessageLoop(void * parameter){
+  while (true) {
+    
+    while (!client.connected()) {
+      vTaskDelay(20 / portTICK_PERIOD_MS);
+    }
+    if (client.connected()) {
+      StaticJsonDocument<256> doc;
+      doc["sensor"] = "gps";
+      doc["time"] = 1351824120;
+
+      // Add an array.
+      //
+      JsonArray data = doc.createNestedArray("data");
+      data.add(48.756080);
+      data.add(2.302038);
+      //doc["data"]=data;
+      // Generate the minified JSON and send it to the Serial port.
+      //
+      char out[128];
+      int b =serializeJson(doc, out);
+      Serial.print("bytes = ");
+      Serial.println(b,DEC);
+
+      Serial.println("Publishing topic hello.");
+      if (client.publish("hello", out)){
+        Serial.println("MQTT message sent successfully");
+
+        whiteLED.toggle();
+
+      }else{
+        Serial.println("MQTT message failed to publish");
+      }
+    }
+
+    vTaskDelay(10000 / portTICK_PERIOD_MS);  // wait for a second  
+  }     
+}
+
+void mqttClientLoop(void * parameter){
+  while (true) {
+    client.loop();
+
+    vTaskDelay(10 / portTICK_PERIOD_MS);  // wait for a second  
+
+    if (!client.connected()) {
+      reconnect();
+    }
+  }
+}
+
 void setup() {
   builtInLED.begin();
+  whiteLED.begin();
 
   Serial.begin(9600);
 
@@ -231,29 +289,41 @@ void setup() {
     Serial.print(asctime(&timeinfo));
 
   // mqtts things
-  net.setCACert(ca_cert);
+  //net.setCACert(ca_cert);
   // hivemq
   //client.setServer("2eddfd9c7eba4f5a8fa6cc3d402240e3.s1.eu.hivemq.cloud", 8883);
   
   //emqx
-  client.setServer("broker.emqx.io", 8883);
+  //client.setServer("broker.emqx.io", 8883);
+  client.setServer("broker.emqx.io", 1883);
 
   client.setCallback(callback);
   
   reconnect();
+
+  xTaskCreate(
+    mqttSendMessageLoop,  /* Task function. */
+    "TaskOne",            /* String with name of task. */
+    10000,                /* Stack size in bytes. */
+    NULL,                 /* Parameter passed as input of the task */
+    1,                    /* Priority of the task. */
+    NULL
+  );                      /* Task handle. */
+  
+  xTaskCreate(
+    mqttClientLoop,  /* Task function. */
+    "TaskOne",            /* String with name of task. */
+    10000,                /* Stack size in bytes. */
+    NULL,                 /* Parameter passed as input of the task */
+    1,                    /* Priority of the task. */
+    NULL
+  );  
+
 }
 
 void loop() {
-  
-  client.loop();
-  delay(10);  // <- fixes some issues with WiFi stability
 
-  if (!client.connected()) {
-    reconnect();
-  }
-   
-
-  //vTaskDelay(5000 / portTICK_PERIOD_MS);  // wait for a second       
+  vTaskDelay(9999999 / portTICK_PERIOD_MS);  // wait for a second       
 }
 
 
