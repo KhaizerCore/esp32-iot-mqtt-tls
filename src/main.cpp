@@ -16,7 +16,7 @@ using namespace std;
 
 #define LED_BUILTIN 2
 
-
+#define MQTT_PACKET_SIZE 4096
 
 const char jsonBoardData[] PROGMEM = R"=====(
 {
@@ -146,7 +146,7 @@ void reconnectMQTT(){
 
 void controlLoop(void * parameter){
   while (true) {
-      StaticJsonDocument<256> doc;
+      StaticJsonDocument<4000> doc;
       doc["sensor"] = "gps";
       doc["time"] = 1351824120;
 
@@ -157,105 +157,12 @@ void controlLoop(void * parameter){
       data.add(2.302038);
       data.add(48.756080);
       data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
      
       
       //doc["data"]=data;
       // Generate the minified JSON and send it to the Serial port.
       //
-      char out[1024];
+      char out[4000];
       int b =serializeJson(doc, out);
       Serial.print("bytes = ");
       Serial.println(b,DEC);
@@ -323,7 +230,7 @@ void adjustTime(){
 }
 
 void mqttSetup(){
-  client.setBufferSize(1024);
+  client.setBufferSize(MQTT_PACKET_SIZE);
   // mqtts things
   net.setCACert(certificates.emqx);
   
