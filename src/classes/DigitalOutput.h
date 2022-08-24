@@ -14,7 +14,8 @@ class DigitalOutput : Port {       // The class
     public: 
         void begin();
         void turnOn();
-        void turnOff();        
+        void turnOff();
+        void toggle();        
 };
 
 #endif

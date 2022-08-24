@@ -23,3 +23,7 @@ void DigitalOutput :: turnOn(){
 void DigitalOutput :: turnOff(){
     digitalWrite(pino, !nivelLogico);
 }
+
+void DigitalOutput :: toggle(){
+    digitalWrite(pino, !digitalRead(pino));
+}
