@@ -3,7 +3,7 @@
 #ifndef DIGITALOUTPUT_H
 #define DIGITALOUTPUT_H
 
-class DigitalOutput : Port {       // The class
+class DigitalOutput : public Port {       // The class
     public:             // Access specifier
         int tipo;    
         bool nivelLogico;
@@ -12,7 +12,6 @@ class DigitalOutput : Port {       // The class
     DigitalOutput(int, int, int, bool);
 
     public: 
-        void begin();
         void turnOn();
         void turnOff();
         void toggle();        

@@ -12,69 +12,100 @@
 #include <ArduinoJson.h>
 #include <vector>
 #include <time.h>
+#include <DHT.h>
+
 using namespace std;
 
 #define LED_BUILTIN 2
-
 #define MQTT_PACKET_SIZE 4096
+#define JSON_SETUP_SIZE 1024
+#define DHTPIN 4
+#define DHTTYPE DHT11
 
-const char jsonBoardData[] PROGMEM = R"=====(
-{
-  "license_key": "347848d2-757c-4861-a3e5-c8e12e3c538d",
-  "device_setup": [
-    {
-      "TYPE": "VARIABLE",
-      "VARIABLE_NAME": "virtual switch",
-      "NAME": "Switch",
-      "PIN": -1,
-      "CODE": "SWITCH",
-      "VALUE": true,
-      "VALUE_TYPE": "BOOL",
-      "TOPIC_ID": "7ffa7884-b40b-4ac5-9324-54f36c038192"
-    },
-    {
-      "TYPE": "INPUT",
-      "VARIABLE_NAME": "",
-      "NAME": "DHT22",
-      "PIN": 2,
-      "CODE": "DHT22",
-      "VALUE": 0,
-      "VALUE_TYPE": "float",
-      "TOPIC_ID": "1609c623-9387-4eb2-b6e4-af1b9a15061c"
-    },
-    {
-      "TYPE": "OUTPUT",
-      "VARIABLE_NAME": "",
-      "NAME": "Luz da lampada",
-      "PIN": 5,
-      "CODE": "LED",
-      "VALUE": true,
-      "VALUE_TYPE": "BOOL",
-      "TOPIC_ID": "a22ab6e6-6ff1-4164-af49-83a372db5e2a"
-    }
-  ]
+// Setup do componente 1
+DynamicJsonDocument setup1(){
+  DynamicJsonDocument setup_1(JSON_SETUP_SIZE);
+  setup_1["TYPE"] = "VARIABLE";
+  setup_1["VARIABLE_NAME"] = "virtual switch";
+  setup_1["NAME"] = "Switch";
+  setup_1["PIN"] = -1;
+  setup_1["CODE"] = "SWITCH";
+  setup_1["VALUE"] = true;
+  setup_1["VALUE_TYPE"] = "BOOL";
+  setup_1["TOPIC_ID"] = "7ffa7884-b40b-4ac5-9324-54f36c038192";
+  return setup_1;
 }
-)=====";
+
+// Setup do componente 2
+DynamicJsonDocument setup2(){
+  DynamicJsonDocument setup_2(JSON_SETUP_SIZE);
+  setup_2["TYPE"] = "INPUT";
+  setup_2["VARIABLE_NAME"] = "";
+  setup_2["NAME"] = "DHT22";
+  setup_2["PIN"] = 2;
+  setup_2["CODE"] = "DHT22";
+  setup_2["VALUE"] = 0.0;
+  setup_2["VALUE_TYPE"] = "float";
+  setup_2["TOPIC_ID"] = "1609c623-9387-4eb2-b6e4-af1b9a15061c";
+  return setup_2;
+}
+
+// Setup do componente 3
+DynamicJsonDocument setup3(){
+  DynamicJsonDocument setup_3(JSON_SETUP_SIZE);
+  setup_3["TYPE"] = "OUTPUT";
+  setup_3["VARIABLE_NAME"] = "";
+  setup_3["NAME"] = "Luz da lampada";
+  setup_3["PIN"] = 5;
+  setup_3["CODE"] = "LED";
+  setup_3["VALUE"] = 0;
+  setup_3["VALUE_TYPE"] = "int";
+  setup_3["TOPIC_ID"] = "a22ab6e6-6ff1-4164-af49-83a372db5e2a";
+  return setup_3;
+}
+
+// Licença da placa
+String licenseKey = "347848d2-757c-4861-a3e5-c8e12e3c538d";
+vector<DynamicJsonDocument> setupArray = {setup1(), setup2(), setup3()};
+
+const int jsonBoardDataSize = 256 + JSON_SETUP_SIZE * setupArray.size();
+
+
+DynamicJsonDocument getBoardDataObject(){
+  DynamicJsonDocument boardData(jsonBoardDataSize);
+
+  boardData["license_key"] = licenseKey;
+
+  for (int i = 0; i < setupArray.size(); i++){
+    boardData["device_setup"][i] = setupArray.at(i);
+  }
+
+  return boardData;
+}
+
+String getBoardData(){
+  //char serializedBoardData[jsonBoardSize];
+  String serializedBoardData;
+  
+  serializeJson(getBoardDataObject(), serializedBoardData);
+
+  return serializedBoardData;
+}
+
+const String boardData = getBoardData();
+
+
+
 
 Certificates certificates;
-
 PublicationQueue publicationQueue;
-
-//WiFiClient espClient;
 WiFiClientSecure net;
 PubSubClient client = PubSubClient(net);
-
 DigitalOutput builtInLED(LED_BUILTIN, 1, 0, true);
 DigitalOutput whiteLED(5, 1, 0, true);
-
 Lock mqttLock;
-
 time_t now;
-
-unsigned long lastMillis = 0;
-
-String licenseKey = "347848d2-757c-4861-a3e5-c8e12e3c538d";
-
+DHT dht(DHTPIN, DHTTYPE);
 
 int random_number(int min, int max) //range : [min, max]
 {
@@ -106,11 +137,27 @@ void callback(char* topic, byte* payload, unsigned int length) {
 }
 
 void onConnect(){
-  
-  client.subscribe("inTopic");
 
-  //client.publish("board/connected", jsonBoardData);
-  client.publish("hello", jsonBoardData);
+  // INITIAL SUBSCRIPTIONS   
+  //client.subscribe("inTopic");
+
+  vTaskDelay(10 / portTICK_PERIOD_MS);
+
+  // Subscribe in each server topic related to board's own componentes, in order to receive updates from the web user, trought the middleware
+  for (int i = 0; i < setupArray.size(); i++){
+    String topic_id = setupArray.at(i).getMember("TOPIC_ID");
+    String topic = "server/" + licenseKey + "/setup" + topic_id;
+    client.subscribe(topic.c_str());
+    Serial.println("subscribing to " + topic);
+    vTaskDelay(10 / portTICK_PERIOD_MS);
+  }
+
+  vTaskDelay(50 / portTICK_PERIOD_MS);
+
+  // INITIAL PUBLICATIONS
+  client.publish("board/connected", boardData.c_str());
+
+  vTaskDelay(50 / portTICK_PERIOD_MS);
 }
 
 void reconnectMQTT(){
@@ -118,7 +165,7 @@ void reconnectMQTT(){
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
     // Create a random client ID
-    String clientId = "ESP32Client";
+    String clientId = "ESP32Client-legutaobala";
     String username = "sigiotsystem";
     String password = "sigiotsystem";
 
@@ -140,58 +187,88 @@ void reconnectMQTT(){
       // Wait 5 seconds before retrying
       delay(2000);
     }
+    vTaskDelay(10 / portTICK_PERIOD_MS);
   }
 }
 
 
 void controlLoop(void * parameter){
   while (true) {
-      StaticJsonDocument<4000> doc;
-      doc["sensor"] = "gps";
-      doc["time"] = 1351824120;
+      // StaticJsonDocument<4000> doc;
 
-      // Add an array.
+
+      // Lets post the first element of device setup
+        setupArray.at(1)["VALUE"] = random_number(-10, 40); // generates random number in port
+        
+        const int jsonSize = 256 + JSON_SETUP_SIZE;
+        DynamicJsonDocument boardPartialData(jsonSize);
+
+        boardPartialData["license_key"] = licenseKey;
+        boardPartialData["device_setup"] = setupArray.at(1);
+
+        String serializedBoardPartialData;  
+        serializeJson(boardPartialData, serializedBoardPartialData);
+
+        String topic_id = setupArray.at(1)["TOPIC_ID"];
+        String topic_test = "board/" + licenseKey + "/setup/" + topic_id;
+
+        publicationQueue.push(Publication(topic_test, serializedBoardPartialData.c_str()));
       //
-      JsonArray data = doc.createNestedArray("data");
-      data.add(48.756080);
-      data.add(2.302038);
-      data.add(48.756080);
-      data.add(2.302038);
+
+      // Lets post the first element of device setup
+      // const float temp = dht.readTemperature();
+      //   Serial.println("dht temp:" + String(temp));
+      //   setupArray.at(1)["VALUE"] = temp;
+        
+      //   //const int jsonSize = 256 + JSON_SETUP_SIZE;
+      //   DynamicJsonDocument boardPartialData2(jsonSize);
+
+      //   boardPartialData["license_key"] = licenseKey;
+      //   boardPartialData["device_setup"] = setupArray.at(1);
+
+      //   String serializedBoardPartialData2;  
+      //   serializeJson(boardPartialData2, serializedBoardPartialData2);
+
+      //   String topic_id2 = setupArray.at(1)["TOPIC_ID"];
+      //   String topic_test2 = "board/" + licenseKey + "/setup/" + topic_id2;
+
+      //   publicationQueue.push(Publication(topic_test2, serializedBoardPartialData2.c_str()));
+      //
+
+    //   doc["sensor"] = "gps";
+    //   doc["time"] = 1351824120;
+
+    //   // Add an array.
+    //   //
+    //   JsonArray data = doc.createNestedArray("data");
+    //   data.add(random_number(0, 100));
+    //   data.add(random_number(0, 100));
+    //   data.add(random_number(0, 100));
+    //   data.add(random_number(0, 100));
      
       
-      //doc["data"]=data;
-      // Generate the minified JSON and send it to the Serial port.
-      //
-      char out[4000];
-      int b =serializeJson(doc, out);
-      Serial.print("bytes = ");
-      Serial.println(b,DEC);
+    //   //doc["data"]=data;
+    //   // Generate the minified JSON and send it to the Serial port.
+    //   //
+    //   char out[4000];
+    //   int b =serializeJson(doc, out);
+    //   Serial.print("bytes = ");
+    //   Serial.println(b,DEC);
 
       
 
-      String topic = "hello";
-      String message = String(out);
+    //   String topic = "hello";
+    //   String message = String(out);
 
-    publicationQueue.push(Publication(topic, message));
+    // publicationQueue.push(Publication(topic, message));
 
-    Serial.println("Added publication to queue");
-    Serial.println("Queue empty: "+String(publicationQueue.empty()));
+    // Serial.println("Added publication to queue");
+    //Serial.println("Queue empty: "+String(publicationQueue.empty()));
 
     vTaskDelay(5000 / portTICK_PERIOD_MS);  // wait for a second  
   }     
 }
 
-void mqttClientLoop(void * parameter){
-  while (true) {
-    client.loop();
-
-    vTaskDelay(10 / portTICK_PERIOD_MS);  // wait for 10ms 
-
-    if (!client.connected()) {
-      reconnectMQTT();
-    }
-  }
-}
 
 void connectWifi(){
   //Wifi Connection
@@ -232,9 +309,11 @@ void adjustTime(){
 void mqttSetup(){
   client.setBufferSize(MQTT_PACKET_SIZE);
   // mqtts things
-  net.setCACert(certificates.emqx);
+  net.setCACert(certificates.hivemq);
   
-  client.setServer("broker.emqx.io", 8883);
+  //client.setServer("broker.emqx.io", 8883);
+
+  client.setServer("2eddfd9c7eba4f5a8fa6cc3d402240e3.s1.eu.hivemq.cloud", 8883);
 
   client.setCallback(callback);
 }
@@ -256,17 +335,21 @@ void sendPublicationQueue(){
     }else{
       Serial.println("MQTT message failed to publish");
     }
+    vTaskDelay(5 / portTICK_PERIOD_MS);  // wait for 5 ms 
     mqttLock.release();
-    //vTaskDelay(5 / portTICK_PERIOD_MS);  // wait for a second  
+    vTaskDelay(5 / portTICK_PERIOD_MS);  // wait for 5 ms
   }
 }
 
 void setup() {
 
+  Serial.begin(9600);
+
+  // Components initialization
+  dht.begin();
   builtInLED.begin();
   whiteLED.begin();
-
-  Serial.begin(9600);
+  //
 
   connectWifi();
 
@@ -286,7 +369,7 @@ void setup() {
     1,                    /* Priority of the task. */
     NULL
   );                      /* Task handle. */
-  
+
 }
 
 void loop() {  
