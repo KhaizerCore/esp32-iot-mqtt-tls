@@ -2,9 +2,10 @@
 #include <FreeRTOS.h>
 #include "./classes/DigitalOutput.h"
 #include "./classes/Lock.h"
-#include "./classes/PublicationQueue.h"
-#include "./classes/Publication.h"
+#include "./classes/TopicMessageQueue.h"
+#include "./classes/TopicMessage.h"
 #include "./classes/Certificates.h"
+#include "./classes/DeviceSetup.h"
 #include "WiFi.h"
 #include <WiFiClientSecure.h>
 //#include <MQTT.h>
@@ -64,41 +65,13 @@ DynamicJsonDocument setup3(){
   return setup_3;
 }
 
-// Licença da placa
 String licenseKey = "347848d2-757c-4861-a3e5-c8e12e3c538d";
-vector<DynamicJsonDocument> setupArray = {setup1(), setup2(), setup3()};
-
-const int jsonBoardDataSize = 256 + JSON_SETUP_SIZE * setupArray.size();
-
-
-DynamicJsonDocument getBoardDataObject(){
-  DynamicJsonDocument boardData(jsonBoardDataSize);
-
-  boardData["license_key"] = licenseKey;
-
-  for (int i = 0; i < setupArray.size(); i++){
-    boardData["device_setup"][i] = setupArray.at(i);
-  }
-
-  return boardData;
-}
-
-String getBoardData(){
-  //char serializedBoardData[jsonBoardSize];
-  String serializedBoardData;
-  
-  serializeJson(getBoardDataObject(), serializedBoardData);
-
-  return serializedBoardData;
-}
-
-const String boardData = getBoardData();
-
-
+DeviceSetup deviceSetup = DeviceSetup(licenseKey, {setup1(), setup2(), setup3()});
 
 
 Certificates certificates;
-PublicationQueue publicationQueue;
+TopicMessageQueue publicationQueue;
+TopicMessageQueue subscribedMessageQueue;
 WiFiClientSecure net;
 PubSubClient client = PubSubClient(net);
 DigitalOutput builtInLED(LED_BUILTIN, 1, 0, true);
@@ -119,15 +92,26 @@ int random_number(int min, int max) //range : [min, max]
 }
 
 
-void callback(char* topic, byte* payload, unsigned int length) {
+void onMessageReceived(char* topic, byte* payload, unsigned int length) {
   mqttLock.acquire();
+  
+  
   Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.print("] ");
+  
+
+
+  String message = "";
   for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
+    message = message + (char)payload[i];
   }
-  Serial.println();
+
+  Serial.println(" Payload: " + message);
+
+  subscribedMessageQueue.push(
+    TopicMessage(String(topic), message)
+  );
 
   // Note: Do not use the client in the callback to publish, subscribe or
   // unsubscribe as it may cause deadlocks when other things arrive while
@@ -139,25 +123,21 @@ void callback(char* topic, byte* payload, unsigned int length) {
 void onConnect(){
 
   // INITIAL SUBSCRIPTIONS   
-  //client.subscribe("inTopic");
-
+  client.subscribe("inTopic");
   vTaskDelay(10 / portTICK_PERIOD_MS);
 
   // Subscribe in each server topic related to board's own componentes, in order to receive updates from the web user, trought the middleware
-  for (int i = 0; i < setupArray.size(); i++){
-    String topic_id = setupArray.at(i).getMember("TOPIC_ID");
-    String topic = "server/" + licenseKey + "/setup" + topic_id;
+  for (int i = 0; i < deviceSetup.setupArray.size(); i++){
+    String topic = deviceSetup.getTopicToSubscribeOnConnectedEvent(i);
     client.subscribe(topic.c_str());
     Serial.println("subscribing to " + topic);
     vTaskDelay(10 / portTICK_PERIOD_MS);
   }
 
-  vTaskDelay(50 / portTICK_PERIOD_MS);
-
   // INITIAL PUBLICATIONS
-  client.publish("board/connected", boardData.c_str());
+  client.publish("board/connected", deviceSetup.getBoardDataJson().c_str());
 
-  vTaskDelay(50 / portTICK_PERIOD_MS);
+  vTaskDelay(10 / portTICK_PERIOD_MS);
 }
 
 void reconnectMQTT(){
@@ -194,79 +174,36 @@ void reconnectMQTT(){
 
 void controlLoop(void * parameter){
   while (true) {
-      // StaticJsonDocument<4000> doc;
-
-
-      // Lets post the first element of device setup
-        setupArray.at(1)["VALUE"] = random_number(-10, 40); // generates random number in port
-        
-        const int jsonSize = 256 + JSON_SETUP_SIZE;
-        DynamicJsonDocument boardPartialData(jsonSize);
-
-        boardPartialData["license_key"] = licenseKey;
-        boardPartialData["device_setup"] = setupArray.at(1);
-
-        String serializedBoardPartialData;  
-        serializeJson(boardPartialData, serializedBoardPartialData);
-
-        String topic_id = setupArray.at(1)["TOPIC_ID"];
-        String topic_test = "board/" + licenseKey + "/setup/" + topic_id;
-
-        publicationQueue.push(Publication(topic_test, serializedBoardPartialData.c_str()));
-      //
-
-      // Lets post the first element of device setup
-      // const float temp = dht.readTemperature();
-      //   Serial.println("dht temp:" + String(temp));
-      //   setupArray.at(1)["VALUE"] = temp;
-        
-      //   //const int jsonSize = 256 + JSON_SETUP_SIZE;
-      //   DynamicJsonDocument boardPartialData2(jsonSize);
-
-      //   boardPartialData["license_key"] = licenseKey;
-      //   boardPartialData["device_setup"] = setupArray.at(1);
-
-      //   String serializedBoardPartialData2;  
-      //   serializeJson(boardPartialData2, serializedBoardPartialData2);
-
-      //   String topic_id2 = setupArray.at(1)["TOPIC_ID"];
-      //   String topic_test2 = "board/" + licenseKey + "/setup/" + topic_id2;
-
-      //   publicationQueue.push(Publication(topic_test2, serializedBoardPartialData2.c_str()));
-      //
-
-    //   doc["sensor"] = "gps";
-    //   doc["time"] = 1351824120;
-
-    //   // Add an array.
-    //   //
-    //   JsonArray data = doc.createNestedArray("data");
-    //   data.add(random_number(0, 100));
-    //   data.add(random_number(0, 100));
-    //   data.add(random_number(0, 100));
-    //   data.add(random_number(0, 100));
-     
-      
-    //   //doc["data"]=data;
-    //   // Generate the minified JSON and send it to the Serial port.
-    //   //
-    //   char out[4000];
-    //   int b =serializeJson(doc, out);
-    //   Serial.print("bytes = ");
-    //   Serial.println(b,DEC);
-
-      
-
-    //   String topic = "hello";
-    //   String message = String(out);
-
-    // publicationQueue.push(Publication(topic, message));
-
-    // Serial.println("Added publication to queue");
-    //Serial.println("Queue empty: "+String(publicationQueue.empty()));
+    // Lets list the first element of device setup that will be publicated, using the publicationQueue
+      const int setup_idx = 1;
+      deviceSetup.setSetupValue<int>(random_number(-10, 40), setup_idx); // updates value of setup value with index 1
+      publicationQueue.push(
+        TopicMessage(
+          deviceSetup.getTopicToBePublicated(setup_idx), 
+          deviceSetup.getJsonBoardPartialData(1).c_str()
+        )
+      );
+    //
 
     vTaskDelay(5000 / portTICK_PERIOD_MS);  // wait for a second  
   }     
+}
+
+void messageReceivedLoop(void* p){
+  while (true) {
+
+    if (!subscribedMessageQueue.empty()) {
+      TopicMessage publication = publicationQueue.front();
+      // To pop, use: publicationQueue.pop_front();
+
+      // convert message string to 
+
+      publicationQueue.pop_front();
+    }
+
+
+    vTaskDelay(5 / portTICK_PERIOD_MS);
+  }
 }
 
 
@@ -315,20 +252,20 @@ void mqttSetup(){
 
   client.setServer("2eddfd9c7eba4f5a8fa6cc3d402240e3.s1.eu.hivemq.cloud", 8883);
 
-  client.setCallback(callback);
+  client.setCallback(onMessageReceived);
 }
 
 
 void sendPublicationQueue(){
   
   while (!publicationQueue.empty() && client.connected()){
-    Publication publication = publicationQueue.front();
+    TopicMessage publication = publicationQueue.front();
 
     Serial.println("Publishing topic "+publication.getTopic());
-    Serial.println("Message: "+publication.getPublication());
+    Serial.println("Message: "+publication.getMessage());
 
     mqttLock.acquire();
-    if (client.publish(publication.getTopic().c_str(), publication.getPublication().c_str())){
+    if (client.publish(publication.getTopic().c_str(), publication.getMessage().c_str())){
       publicationQueue.pop_front();
 
       Serial.println("MQTT message sent successfully");
@@ -359,8 +296,6 @@ void setup() {
   
   reconnectMQTT();
 
-
-
   xTaskCreate(
     controlLoop,  /* Task function. */
     "TaskOne",            /* String with name of task. */
@@ -369,6 +304,15 @@ void setup() {
     1,                    /* Priority of the task. */
     NULL
   );                      /* Task handle. */
+
+  // xTaskCreate(
+  //   messageReceivedLoop,  /* Task function. */
+  //   "TaskTwo",            /* String with name of task. */
+  //   10000,                /* Stack size in bytes. */
+  //   NULL,                 /* Parameter passed as input of the task */
+  //   2,                    /* Priority of the task. */
+  //   NULL
+  // );                      /* Task handle. */
 
 }
 
