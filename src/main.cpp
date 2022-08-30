@@ -189,16 +189,16 @@ void controlLoop(void * parameter){
   }     
 }
 
-void messageReceivedLoop(void* p){
+void messageReceivedLoop(void * parameter){
   while (true) {
 
     if (!subscribedMessageQueue.empty()) {
-      TopicMessage publication = publicationQueue.front();
+      TopicMessage publication = subscribedMessageQueue.front();
       // To pop, use: publicationQueue.pop_front();
 
       // convert message string to 
 
-      publicationQueue.pop_front();
+      subscribedMessageQueue.pop_front();
     }
 
 
@@ -305,14 +305,14 @@ void setup() {
     NULL
   );                      /* Task handle. */
 
-  // xTaskCreate(
-  //   messageReceivedLoop,  /* Task function. */
-  //   "TaskTwo",            /* String with name of task. */
-  //   10000,                /* Stack size in bytes. */
-  //   NULL,                 /* Parameter passed as input of the task */
-  //   2,                    /* Priority of the task. */
-  //   NULL
-  // );                      /* Task handle. */
+  xTaskCreate(
+    messageReceivedLoop,  /* Task function. */
+    "TaskTwo",            /* String with name of task. */
+    10000,                /* Stack size in bytes. */
+    NULL,                 /* Parameter passed as input of the task */
+    1,                    /* Priority of the task. */
+    NULL
+  );                      /* Task handle. */
 
 }
 
