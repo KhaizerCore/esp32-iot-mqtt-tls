@@ -59,8 +59,8 @@ DynamicJsonDocument setup3(){
   setup_3["NAME"] = "Luz da lampada";
   setup_3["PIN"] = 5;
   setup_3["CODE"] = "LED";
-  setup_3["VALUE"] = 0;
-  setup_3["VALUE_TYPE"] = "int";
+  setup_3["VALUE"] = false;
+  setup_3["VALUE_TYPE"] = "BOOL";
   setup_3["TOPIC_ID"] = "a22ab6e6-6ff1-4164-af49-83a372db5e2a";
   return setup_3;
 }
@@ -98,7 +98,7 @@ void onMessageReceived(char* topic, byte* payload, unsigned int length) {
   
   Serial.print("Message arrived [");
   Serial.print(topic);
-  Serial.print("] ");
+  Serial.println("] ");
   
 
 
@@ -173,19 +173,37 @@ void reconnectMQTT(){
 
 
 void controlLoop(void * parameter){
+  int ms_counter = 0;
   while (true) {
+
+    // PUBLICATES EVERY 5 SECONDS
     // Lets list the first element of device setup that will be publicated, using the publicationQueue
-      const int setup_idx = 1;
-      deviceSetup.setSetupValue<int>(random_number(-10, 40), setup_idx); // updates value of setup value with index 1
-      publicationQueue.push(
-        TopicMessage(
-          deviceSetup.getTopicToBePublicated(setup_idx), 
-          deviceSetup.getJsonBoardPartialData(1).c_str()
-        )
-      );
+      if (ms_counter == 5000){
+        const int setup_idx = 1;
+        deviceSetup.setSetupValue<int>(random_number(-10, 40), setup_idx); // updates value of setup value with index 1
+        publicationQueue.push(
+          TopicMessage(
+            deviceSetup.getTopicToBePublicated(setup_idx), 
+            deviceSetup.getJsonBoardPartialData(1).c_str()
+          )
+        );
+        
+        ms_counter = 1;
+        vTaskDelay(1 / portTICK_PERIOD_MS);
+      }
     //
 
-    vTaskDelay(5000 / portTICK_PERIOD_MS);  // wait for a second  
+    bool virtual_switch = deviceSetup.setupArray.at(0).getMember("VALUE");
+    if (virtual_switch) builtInLED.turnOn(); 
+    else builtInLED.turnOff();
+    
+    float dht_22_value = deviceSetup.setupArray.at(1).getMember("VALUE");
+    
+    
+    bool led_value = deviceSetup.setupArray.at(2).getMember("VALUE");
+
+    vTaskDelay(1 / portTICK_PERIOD_MS);  // wait for a second  
+    ms_counter +=1;
   }     
 }
 
@@ -194,9 +212,30 @@ void messageReceivedLoop(void * parameter){
 
     if (!subscribedMessageQueue.empty()) {
       TopicMessage publication = subscribedMessageQueue.front();
-      // To pop, use: publicationQueue.pop_front();
+      
+      for (int setup_idx = 0; setup_idx < deviceSetup.setupArray.size(); setup_idx++){
+        const String myTopic = deviceSetup.getTopicToSubscribeOnConnectedEvent(setup_idx);
+        if (myTopic == publication.getTopic()){
+          
+          DynamicJsonDocument doc(publication.getMessage().length() * 6);
+          DeserializationError err =  deserializeJson(doc, publication.getMessage());
+          
+          if (err){
+            Serial.print("ERROR: ");
+            Serial.println(err.c_str());
+          }else{
+            //Serial.println("Deserialization successfull");
+          }
 
-      // convert message string to 
+          JsonObject jsonMessage = doc.as<JsonObject>();
+
+          for (JsonPair keyValue : jsonMessage) {
+            Serial.println("keyvalue received: " + String(keyValue.key().c_str()));
+            
+            deviceSetup.setupArray.at(setup_idx)[keyValue.key().c_str()] = keyValue.value();
+          }
+        }
+      }
 
       subscribedMessageQueue.pop_front();
     }
@@ -261,7 +300,7 @@ void sendPublicationQueue(){
   while (!publicationQueue.empty() && client.connected()){
     TopicMessage publication = publicationQueue.front();
 
-    Serial.println("Publishing topic "+publication.getTopic());
+    Serial.println("\n\nPublishing topic "+publication.getTopic());
     Serial.println("Message: "+publication.getMessage());
 
     mqttLock.acquire();

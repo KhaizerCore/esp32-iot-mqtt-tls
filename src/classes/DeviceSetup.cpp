@@ -57,5 +57,5 @@ String DeviceSetup :: getTopicToBePublicated(int setup_idx) {
 }
 
 String DeviceSetup :: getTopicToSubscribeOnConnectedEvent(int setup_idx) {
-    return "server/" + this -> license_key + "/setup" + this -> getTopicID(setup_idx);
+    return "server/" + this -> license_key + "/setup/" + this -> getTopicID(setup_idx);
 }
