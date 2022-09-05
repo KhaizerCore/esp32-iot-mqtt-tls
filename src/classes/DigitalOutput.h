@@ -14,7 +14,9 @@ class DigitalOutput : public Port {       // The class
     public: 
         void turnOn();
         void turnOff();
-        void toggle();        
+        void toggle();   
+        bool getPinValue();    
+        bool getState(); 
 };
 
 #endif

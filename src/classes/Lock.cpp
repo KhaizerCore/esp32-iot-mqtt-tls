@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include "Port.h"
 #include "Lock.h"
-#include <cmath>
 
 Lock :: Lock() {
     this -> lock = false;

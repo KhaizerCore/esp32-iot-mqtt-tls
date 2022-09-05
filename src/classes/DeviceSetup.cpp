@@ -39,6 +39,8 @@ template <typename T> void DeviceSetup :: setSetupValue(T value, int setup_idx){
     this -> setupArray.at(setup_idx)["VALUE"] = value;
 }
 template void DeviceSetup::setSetupValue<int>(int, int);
+template void DeviceSetup::setSetupValue<float>(float, int);
+template void DeviceSetup::setSetupValue<bool>(bool, int);
 
 String DeviceSetup :: getJsonBoardPartialData(int setup_idx){
     const int jsonSize = 256 + JSON_SETUP_SIZE;

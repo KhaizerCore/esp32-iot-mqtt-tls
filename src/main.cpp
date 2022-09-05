@@ -18,6 +18,7 @@
 using namespace std;
 
 #define LED_BUILTIN 2
+#define EXTERNAL_LED 5
 #define MQTT_PACKET_SIZE 4096
 #define JSON_SETUP_SIZE 1024
 #define DHTPIN 4
@@ -26,12 +27,12 @@ using namespace std;
 // Setup do componente 1
 DynamicJsonDocument setup1(){
   DynamicJsonDocument setup_1(JSON_SETUP_SIZE);
-  setup_1["TYPE"] = "VARIABLE";
-  setup_1["VARIABLE_NAME"] = "virtual switch";
-  setup_1["NAME"] = "Switch";
-  setup_1["PIN"] = -1;
-  setup_1["CODE"] = "SWITCH";
-  setup_1["VALUE"] = true;
+  setup_1["TYPE"] = "INPUT";
+  setup_1["VARIABLE_NAME"] = "";
+  setup_1["NAME"] = "Humidity";
+  setup_1["PIN"] = 4;
+  setup_1["CODE"] = "DHT11";
+  setup_1["VALUE"] = 0.0;
   setup_1["VALUE_TYPE"] = "BOOL";
   setup_1["TOPIC_ID"] = "7ffa7884-b40b-4ac5-9324-54f36c038192";
   return setup_1;
@@ -42,9 +43,9 @@ DynamicJsonDocument setup2(){
   DynamicJsonDocument setup_2(JSON_SETUP_SIZE);
   setup_2["TYPE"] = "INPUT";
   setup_2["VARIABLE_NAME"] = "";
-  setup_2["NAME"] = "DHT22";
-  setup_2["PIN"] = 2;
-  setup_2["CODE"] = "DHT22";
+  setup_2["NAME"] = "Temperature";
+  setup_2["PIN"] = 4;
+  setup_2["CODE"] = "DHT11";
   setup_2["VALUE"] = 0.0;
   setup_2["VALUE_TYPE"] = "float";
   setup_2["TOPIC_ID"] = "1609c623-9387-4eb2-b6e4-af1b9a15061c";
@@ -56,7 +57,7 @@ DynamicJsonDocument setup3(){
   DynamicJsonDocument setup_3(JSON_SETUP_SIZE);
   setup_3["TYPE"] = "OUTPUT";
   setup_3["VARIABLE_NAME"] = "";
-  setup_3["NAME"] = "Luz da lampada";
+  setup_3["NAME"] = "LED";
   setup_3["PIN"] = 5;
   setup_3["CODE"] = "LED";
   setup_3["VALUE"] = false;
@@ -75,7 +76,7 @@ TopicMessageQueue subscribedMessageQueue;
 WiFiClientSecure net;
 PubSubClient client = PubSubClient(net);
 DigitalOutput builtInLED(LED_BUILTIN, 1, 0, true);
-DigitalOutput whiteLED(5, 1, 0, true);
+DigitalOutput externalLED(EXTERNAL_LED, 1, 0, false);
 Lock mqttLock;
 time_t now;
 DHT dht(DHTPIN, DHTTYPE);
@@ -150,8 +151,8 @@ void reconnectMQTT(){
     String password = "sigiotsystem";
 
     Serial.print("Time:");
-    Serial.print(ctime(&now));
-    Serial.print("MQTT connecting");
+    Serial.println(ctime(&now));
+    Serial.println("MQTT connecting");
     
     // Attempt to connect
     if (client.connect(clientId.c_str(), username.c_str(), password.c_str())) {
@@ -173,37 +174,38 @@ void reconnectMQTT(){
 
 
 void controlLoop(void * parameter){
-  int ms_counter = 0;
   while (true) {
 
-    // PUBLICATES EVERY 5 SECONDS
-    // Lets list the first element of device setup that will be publicated, using the publicationQueue
-      if (ms_counter == 5000){
-        const int setup_idx = 1;
-        deviceSetup.setSetupValue<int>(random_number(-10, 40), setup_idx); // updates value of setup value with index 1
-        publicationQueue.push(
-          TopicMessage(
-            deviceSetup.getTopicToBePublicated(setup_idx), 
-            deviceSetup.getJsonBoardPartialData(1).c_str()
-          )
-        );
-        
-        ms_counter = 1;
-        vTaskDelay(1 / portTICK_PERIOD_MS);
-      }
-    //
+    float humidity = deviceSetup.setupArray.at(0).getMember("VALUE");
+    bool ledState = deviceSetup.setupArray.at(2).getMember("VALUE");
+    
+    if (humidity < 75 && !ledState){
+      
+      externalLED.turnOn();
 
-    bool virtual_switch = deviceSetup.setupArray.at(0).getMember("VALUE");
-    if (virtual_switch) builtInLED.turnOn(); 
-    else builtInLED.turnOff();
-    
-    float dht_22_value = deviceSetup.setupArray.at(1).getMember("VALUE");
-    
-    
-    bool led_value = deviceSetup.setupArray.at(2).getMember("VALUE");
+      deviceSetup.setSetupValue<bool>(externalLED.getState(), 2); // updates value of setup value with index 1
+      publicationQueue.push(
+          TopicMessage(
+            deviceSetup.getTopicToBePublicated(2), 
+            deviceSetup.getJsonBoardPartialData(2).c_str()
+          )
+      );
+    }
+
+    if (humidity >= 80 && ledState){
+
+      externalLED.turnOff();
+
+      deviceSetup.setSetupValue<bool>(externalLED.getState(), 2); // updates value of setup value with index 1
+      publicationQueue.push(
+          TopicMessage(
+            deviceSetup.getTopicToBePublicated(2), 
+            deviceSetup.getJsonBoardPartialData(2).c_str()
+          )
+      );
+    }
 
     vTaskDelay(1 / portTICK_PERIOD_MS);  // wait for a second  
-    ms_counter +=1;
   }     
 }
 
@@ -317,6 +319,36 @@ void sendPublicationQueue(){
   }
 }
 
+void readDHTSensor(void * parameter){
+  while(true){
+    
+    vTaskDelay(2500 / portTICK_PERIOD_MS);
+    float humidity = dht.readHumidity();
+    deviceSetup.setSetupValue<float>(humidity, 0); // updates value of setup value with index 0
+    
+    vTaskDelay(2500 / portTICK_PERIOD_MS);
+    float temperature = dht.readTemperature();        
+    deviceSetup.setSetupValue<float>(temperature, 1); // updates value of setup value with index 1
+
+    int setup_idx = 0;       
+    publicationQueue.push(
+      TopicMessage(
+        deviceSetup.getTopicToBePublicated(setup_idx), 
+        deviceSetup.getJsonBoardPartialData(setup_idx).c_str()
+      )
+    );
+
+    setup_idx++;
+    publicationQueue.push(
+      TopicMessage(
+        deviceSetup.getTopicToBePublicated(setup_idx), 
+        deviceSetup.getJsonBoardPartialData(setup_idx).c_str()
+      )
+    );
+  
+  }
+}
+
 void setup() {
 
   Serial.begin(9600);
@@ -324,7 +356,7 @@ void setup() {
   // Components initialization
   dht.begin();
   builtInLED.begin();
-  whiteLED.begin();
+  externalLED.begin();
   //
 
   connectWifi();
@@ -353,12 +385,21 @@ void setup() {
     NULL
   );                      /* Task handle. */
 
+  xTaskCreate(
+    readDHTSensor,  /* Task function. */
+    "TaskThree",            /* String with name of task. */
+    2000,                /* Stack size in bytes. */
+    NULL,                 /* Parameter passed as input of the task */
+    2,                    /* Priority of the task. */
+    NULL
+  );
+
 }
 
 void loop() {  
   client.loop();
 
-  vTaskDelay(10 / portTICK_PERIOD_MS);  // wait for a second  
+  vTaskDelay(10 / portTICK_PERIOD_MS);  // wait for 10ms
 
   if (!client.connected()) {
     reconnectMQTT();

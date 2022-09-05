@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include "Port.h"
 #include "DigitalOutput.h"
-#include <cmath>
 
 DigitalOutput :: DigitalOutput() : Port () {};
 
@@ -22,4 +21,19 @@ void DigitalOutput :: turnOff(){
 
 void DigitalOutput :: toggle(){
     digitalWrite(pino, !digitalRead(pino));
+}
+
+bool DigitalOutput :: getPinValue(){
+    return digitalRead(this -> pino);
+}
+
+/*
+NL INPUT state
+ 0   0     1
+ 0   1     0
+ 1   0     0
+ 1   1     1
+*/
+bool DigitalOutput :: getState(){
+    return digitalRead(this -> pino) == this -> nivelLogico;
 }
