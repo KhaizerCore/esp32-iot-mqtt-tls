@@ -6,8 +6,8 @@ DigitalOutput :: DigitalOutput() : Port () {};
 
 // Ventilador(int pin, bool nl) : Atuador(pin, nl)
 
-DigitalOutput :: DigitalOutput(int pino, int tipo, int periodo, bool nivelLogico) : Port(pino, periodo, OUTPUT) {
-    this -> tipo = tipo;
+DigitalOutput :: DigitalOutput(int pino, bool nivelLogico) : Port(pino, OUTPUT) {
+    //this -> tipo = tipo;
     this -> nivelLogico = nivelLogico;
 };
 

@@ -6,7 +6,7 @@
 #include "./classes/TopicMessage.h"
 #include "./classes/Certificates.h"
 #include "./classes/DeviceSetup.h"
-#include "WiFi.h"
+//#include "WiFi.h"
 #include <WiFiClientSecure.h>
 //#include <MQTT.h>
 #include <PubSubClient.h>
@@ -70,13 +70,13 @@ String licenseKey = "347848d2-757c-4861-a3e5-c8e12e3c538d";
 DeviceSetup deviceSetup = DeviceSetup(licenseKey, {setup1(), setup2(), setup3()});
 
 
-Certificates certificates;
+//Certificates certificates;
 TopicMessageQueue publicationQueue;
 TopicMessageQueue subscribedMessageQueue;
 WiFiClientSecure net;
 PubSubClient client = PubSubClient(net);
-DigitalOutput builtInLED(LED_BUILTIN, 1, 0, true);
-DigitalOutput externalLED(EXTERNAL_LED, 1, 0, false);
+DigitalOutput builtInLED(LED_BUILTIN, true);
+DigitalOutput externalLED(EXTERNAL_LED, false);
 Lock mqttLock;
 time_t now;
 DHT dht(DHTPIN, DHTTYPE);
@@ -172,37 +172,13 @@ void reconnectMQTT(){
   }
 }
 
-
 void controlLoop(void * parameter){
   while (true) {
 
-    float humidity = deviceSetup.setupArray.at(0).getMember("VALUE");
-    bool ledState = deviceSetup.setupArray.at(2).getMember("VALUE");
-    
-    if (humidity < 75 && !ledState){
-      
+    if (deviceSetup.setupArray.at(2)["VALUE"]){
       externalLED.turnOn();
-
-      deviceSetup.setSetupValue<bool>(externalLED.getState(), 2); // updates value of setup value with index 1
-      publicationQueue.push(
-          TopicMessage(
-            deviceSetup.getTopicToBePublicated(2), 
-            deviceSetup.getJsonBoardPartialData(2).c_str()
-          )
-      );
-    }
-
-    if (humidity >= 80 && ledState){
-
+    }else{
       externalLED.turnOff();
-
-      deviceSetup.setSetupValue<bool>(externalLED.getState(), 2); // updates value of setup value with index 1
-      publicationQueue.push(
-          TopicMessage(
-            deviceSetup.getTopicToBePublicated(2), 
-            deviceSetup.getJsonBoardPartialData(2).c_str()
-          )
-      );
     }
 
     vTaskDelay(1 / portTICK_PERIOD_MS);  // wait for a second  
@@ -247,7 +223,6 @@ void messageReceivedLoop(void * parameter){
   }
 }
 
-
 void connectWifi(){
   //Wifi Connection
   String ssid = "Casa Router 4";
@@ -287,7 +262,7 @@ void adjustTime(){
 void mqttSetup(){
   client.setBufferSize(MQTT_PACKET_SIZE);
   // mqtts things
-  net.setCACert(certificates.hivemq);
+  net.setCACert(hivemqCert);
   
   //client.setServer("broker.emqx.io", 8883);
 
@@ -295,7 +270,6 @@ void mqttSetup(){
 
   client.setCallback(onMessageReceived);
 }
-
 
 void sendPublicationQueue(){
   
@@ -321,31 +295,33 @@ void sendPublicationQueue(){
 
 void readDHTSensor(void * parameter){
   while(true){
-    
-    vTaskDelay(2500 / portTICK_PERIOD_MS);
+    vTaskDelay(2000 / portTICK_PERIOD_MS);   
+
     float humidity = dht.readHumidity();
     deviceSetup.setSetupValue<float>(humidity, 0); // updates value of setup value with index 0
-    
-    vTaskDelay(2500 / portTICK_PERIOD_MS);
+
     float temperature = dht.readTemperature();        
     deviceSetup.setSetupValue<float>(temperature, 1); // updates value of setup value with index 1
 
-    int setup_idx = 0;       
-    publicationQueue.push(
-      TopicMessage(
-        deviceSetup.getTopicToBePublicated(setup_idx), 
-        deviceSetup.getJsonBoardPartialData(setup_idx).c_str()
-      )
-    );
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
 
-    setup_idx++;
-    publicationQueue.push(
-      TopicMessage(
-        deviceSetup.getTopicToBePublicated(setup_idx), 
-        deviceSetup.getJsonBoardPartialData(setup_idx).c_str()
-      )
-    );
-  
+    if (!isnan(humidity) & !isnan(temperature)){
+      int setup_idx = 0;       
+      publicationQueue.push(
+        TopicMessage(
+          deviceSetup.getTopicToBePublicated(setup_idx), 
+          deviceSetup.getJsonBoardPartialData(setup_idx).c_str()
+        )
+      );
+
+      setup_idx++;
+      publicationQueue.push(
+        TopicMessage(
+          deviceSetup.getTopicToBePublicated(setup_idx), 
+          deviceSetup.getJsonBoardPartialData(setup_idx).c_str()
+        )
+      );
+    }
   }
 }
 

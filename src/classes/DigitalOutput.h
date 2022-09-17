@@ -5,11 +5,11 @@
 
 class DigitalOutput : public Port {       // The class
     public:             // Access specifier
-        int tipo;    
+        //int tipo;    
         bool nivelLogico;
 
     DigitalOutput();
-    DigitalOutput(int, int, int, bool);
+    DigitalOutput(int, bool);
 
     public: 
         void turnOn();

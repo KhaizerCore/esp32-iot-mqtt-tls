@@ -4,9 +4,8 @@
 
 Port::Port(){}
 
-Port::Port(int pino, int periodo, uint8_t mode) {
+Port::Port(int pino, uint8_t mode) {
     this -> pino = pino;
-    this -> periodoAmostragem = periodo;
     this -> mode = mode;
 };
 
