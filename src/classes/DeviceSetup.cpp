@@ -54,7 +54,7 @@ String DeviceSetup :: getJsonBoardPartialData(int setup_idx){
     return serializedBoardPartialData;
 }
 
-String DeviceSetup :: getTopicToBePublicated(int setup_idx) {
+String DeviceSetup :: getTopicToBePublished(int setup_idx) {
     return "board/" + this ->license_key + "/setup/" + this -> getTopicID(setup_idx);
 }
 

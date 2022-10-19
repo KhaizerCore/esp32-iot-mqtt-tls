@@ -11,7 +11,7 @@ class TopicMessage {       // The class
         String message;
 
     public: 
-        TopicMessage();
+        //TopicMessage();
         TopicMessage(String, String);
 
         String getTopic();

@@ -23,7 +23,7 @@ class DeviceSetup {       // The class
         String getTopicID(int);
         template <typename T> void setSetupValue(T, int);
         String getJsonBoardPartialData(int);
-        String getTopicToBePublicated(int);
+        String getTopicToBePublished(int);
         String getTopicToSubscribeOnConnectedEvent(int);
 };
 

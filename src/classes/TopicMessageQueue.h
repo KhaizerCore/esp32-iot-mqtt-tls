@@ -10,14 +10,14 @@ using namespace std;
 
 class TopicMessageQueue {       // The class
     private:             // Access specifier
-        vector<TopicMessage> topicMessageQueue;
+        vector<TopicMessage> queue;
 
     public: 
         TopicMessageQueue();
 
         TopicMessage front();         
         TopicMessage pop_front();
-        void push(TopicMessage); 
+        void push_back(TopicMessage); 
         bool empty();
 };
 

@@ -14,6 +14,7 @@
 #include <vector>
 #include <time.h>
 #include <DHT.h>
+#include <Display.h>
 
 using namespace std;
 
@@ -33,7 +34,7 @@ DynamicJsonDocument setup1(){
   setup_1["PIN"] = 4;
   setup_1["CODE"] = "DHT11";
   setup_1["VALUE"] = 0.0;
-  setup_1["VALUE_TYPE"] = "BOOL";
+  setup_1["VALUE_TYPE"] = "DOUBLE";
   setup_1["TOPIC_ID"] = "7ffa7884-b40b-4ac5-9324-54f36c038192";
   return setup_1;
 }
@@ -66,8 +67,22 @@ DynamicJsonDocument setup3(){
   return setup_3;
 }
 
+// Setup do componente 4
+DynamicJsonDocument setup4(){
+  DynamicJsonDocument setup_4(JSON_SETUP_SIZE);
+  setup_4["TYPE"] = "VARIABLE";
+  setup_4["VARIABLE_NAME"] = "displayText";
+  setup_4["NAME"] = "Display Text";
+  setup_4["PIN"] = -1;
+  setup_4["CODE"] = "displayText";
+  setup_4["VALUE"] = "Initial Text";
+  setup_4["VALUE_TYPE"] = "STRING";
+  setup_4["TOPIC_ID"] = "7ffa7884-6ff1-4eb2-af49-83a372db5e21";
+  return setup_4;
+}
+
 String licenseKey = "347848d2-757c-4861-a3e5-c8e12e3c538d";
-DeviceSetup deviceSetup = DeviceSetup(licenseKey, {setup1(), setup2(), setup3()});
+DeviceSetup deviceSetup = DeviceSetup(licenseKey, {setup1(), setup2(), setup3(), setup3()});
 
 
 //Certificates certificates;
@@ -80,6 +95,7 @@ DigitalOutput externalLED(EXTERNAL_LED, false);
 Lock mqttLock;
 time_t now;
 DHT dht(DHTPIN, DHTTYPE);
+Display display = Display();
 
 int random_number(int min, int max) //range : [min, max]
 {
@@ -110,7 +126,7 @@ void onMessageReceived(char* topic, byte* payload, unsigned int length) {
 
   Serial.println(" Payload: " + message);
 
-  subscribedMessageQueue.push(
+  subscribedMessageQueue.push_back(
     TopicMessage(String(topic), message)
   );
 
@@ -212,6 +228,12 @@ void messageReceivedLoop(void * parameter){
             
             deviceSetup.setupArray.at(setup_idx)[keyValue.key().c_str()] = keyValue.value();
           }
+
+          // Display update support
+          if (setup_idx == 3){
+            String text = deviceSetup.setupArray.at(3)["VALUE"];
+            display.print(text, 10, 2);
+          }
         }
       }
 
@@ -287,9 +309,9 @@ void sendPublicationQueue(){
     }else{
       Serial.println("MQTT message failed to publish");
     }
-    vTaskDelay(5 / portTICK_PERIOD_MS);  // wait for 5 ms 
+    vTaskDelay(1 / portTICK_PERIOD_MS);  // wait for 1 ms 
     mqttLock.release();
-    vTaskDelay(5 / portTICK_PERIOD_MS);  // wait for 5 ms
+    vTaskDelay(1 / portTICK_PERIOD_MS);  // wait for 1 ms
   }
 }
 
@@ -307,17 +329,17 @@ void readDHTSensor(void * parameter){
 
     if (!isnan(humidity) & !isnan(temperature)){
       int setup_idx = 0;       
-      publicationQueue.push(
+      publicationQueue.push_back(
         TopicMessage(
-          deviceSetup.getTopicToBePublicated(setup_idx), 
+          deviceSetup.getTopicToBePublished(setup_idx), 
           deviceSetup.getJsonBoardPartialData(setup_idx).c_str()
         )
       );
 
       setup_idx++;
-      publicationQueue.push(
+      publicationQueue.push_back(
         TopicMessage(
-          deviceSetup.getTopicToBePublicated(setup_idx), 
+          deviceSetup.getTopicToBePublished(setup_idx), 
           deviceSetup.getJsonBoardPartialData(setup_idx).c_str()
         )
       );
@@ -333,7 +355,13 @@ void setup() {
   dht.begin();
   builtInLED.begin();
   externalLED.begin();
+
+  display.begin();
+  display.init();
   //
+
+  delay(1000);
+  display.printTest();
 
   connectWifi();
 
