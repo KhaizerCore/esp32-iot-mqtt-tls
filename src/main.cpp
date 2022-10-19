@@ -72,7 +72,7 @@ DynamicJsonDocument setup4(){
   DynamicJsonDocument setup_4(JSON_SETUP_SIZE);
   setup_4["TYPE"] = "VARIABLE";
   setup_4["VARIABLE_NAME"] = "displayText";
-  setup_4["NAME"] = "Display Text";
+  setup_4["NAME"] = "DisplayText";
   setup_4["PIN"] = -1;
   setup_4["CODE"] = "displayText";
   setup_4["VALUE"] = "Initial Text";
@@ -82,7 +82,7 @@ DynamicJsonDocument setup4(){
 }
 
 String licenseKey = "347848d2-757c-4861-a3e5-c8e12e3c538d";
-DeviceSetup deviceSetup = DeviceSetup(licenseKey, {setup1(), setup2(), setup3(), setup3()});
+DeviceSetup deviceSetup = DeviceSetup(licenseKey, {setup1(), setup2(), setup3(), setup4()});
 
 
 //Certificates certificates;
@@ -360,8 +360,9 @@ void setup() {
   display.init();
   //
 
-  delay(1000);
-  display.printTest();
+  delay(50);
+  String text = deviceSetup.setupArray.at(3)["VALUE"];
+  display.print(text, 10, 2);
 
   connectWifi();
 
