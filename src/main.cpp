@@ -1,11 +1,11 @@
 #include <Arduino.h>
 #include <FreeRTOS.h>
-#include "./classes/DigitalOutput.h"
-#include "./classes/Lock.h"
-#include "./classes/TopicMessageQueue.h"
-#include "./classes/TopicMessage.h"
-#include "./classes/Certificates.h"
-#include "./classes/DeviceSetup.h"
+#include "DigitalOutput.h"
+#include "Lock.h"
+#include "TopicMessageQueue.h"
+#include "TopicMessage.h"
+#include "Certificates.h"
+#include "DeviceSetup.h"
 //#include "WiFi.h"
 #include <WiFiClientSecure.h>
 //#include <MQTT.h>
@@ -81,7 +81,7 @@ DynamicJsonDocument setup4(){
   return setup_4;
 }
 
-String licenseKey = "347848d2-757c-4861-a3e5-c8e12e3c538d";
+String licenseKey = "80c7ebba-762b-4c22-80fa-1bfd31e4535f";
 DeviceSetup deviceSetup = DeviceSetup(licenseKey, {setup1(), setup2(), setup3(), setup4()});
 
 
@@ -247,8 +247,8 @@ void messageReceivedLoop(void * parameter){
 
 void connectWifi(){
   //Wifi Connection
-  String ssid = "Casa Router 4";
-  String password = "Caxambu1942";
+  String ssid = "Galaxy M52 5G";
+  String password = "jyil3233";
   WiFi.begin((const char*)ssid.c_str(), (const char*)password.c_str());
   
   // Print WIFI Info
