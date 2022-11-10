@@ -3,18 +3,20 @@
 #ifndef DIGITALOUTPUT_H
 #define DIGITALOUTPUT_H
 
-class DigitalOutput : Port {       // The class
+class DigitalOutput : public Port {       // The class
     public:             // Access specifier
-        int tipo;    
+        //int tipo;    
         bool nivelLogico;
 
     DigitalOutput();
-    DigitalOutput(int, int, int, bool);
+    DigitalOutput(int, bool);
 
     public: 
-        void begin();
         void turnOn();
-        void turnOff();        
+        void turnOff();
+        void toggle();   
+        bool getPinValue();    
+        bool getState(); 
 };
 
 #endif
